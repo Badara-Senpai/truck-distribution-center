@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
+	"time"
 )
 
 type Truck interface {
@@ -51,7 +53,10 @@ func (et *ElectricTruck) UnloadCargo() error {
 
 // processTruck handles the loading and the unloading of a truck
 func processTruck(truck Truck) error {
-	fmt.Printf("processing truck %v\n", truck)
+	fmt.Printf("Started processing truck %+v \n", truck)
+
+	// Simulate processing time
+	time.Sleep(time.Second)
 
 	if err := truck.LoadCargo(); err != nil {
 		return fmt.Errorf("error loading cargo: %w", err)
@@ -61,21 +66,42 @@ func processTruck(truck Truck) error {
 		return fmt.Errorf("error unloading cargo: %w", err)
 	}
 
+	fmt.Printf("Finished processing truck %+v \n", truck)
+	return nil
+}
+
+func processFleet(trucks []Truck) error {
+	var wg sync.WaitGroup
+
+	for _, t := range trucks {
+		wg.Add(1)
+
+		go func(t Truck) {
+			if err := processTruck(t); err != nil {
+				log.Println(err)
+			}
+
+			wg.Done()
+		}(t)
+	}
+
+	wg.Wait()
+
 	return nil
 }
 
 func main() {
-	nt := &NormalTruck{id: "Truck-1"}
-	et := &ElectricTruck{id: "e-Truck-1"}
-
-	if err := processTruck(nt); err != nil {
-		log.Fatalf("Error processing truck: %s", err)
+	fleet := []Truck{
+		&NormalTruck{id: "NT1", cargo: 0},
+		&ElectricTruck{id: "ET1", cargo: 0, battery: 100},
+		&NormalTruck{id: "NT2", cargo: 0},
+		&ElectricTruck{id: "ET1", cargo: 0, battery: 100},
 	}
 
-	if err := processTruck(et); err != nil {
-		log.Fatalf("Error processing truck: %s", err)
+	if err := processFleet(fleet); err != nil {
+		fmt.Printf("Error processing fleet: %v\n", err)
+		return
 	}
 
-	log.Println(nt.cargo)
-	log.Println(et.battery)
+	fmt.Println("All trucks processed successfully")
 }
