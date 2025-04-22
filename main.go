@@ -92,12 +92,15 @@ func processTruck(ctx context.Context, truck Truck) error {
 func processFleet(ctx context.Context, trucks []Truck) error {
 	var wg sync.WaitGroup
 
+	errorsChan := make(chan error, len(trucks))
+
 	for _, t := range trucks {
 		wg.Add(1)
 
 		go func(t Truck) {
 			if err := processTruck(ctx, t); err != nil {
 				log.Println(err)
+				errorsChan <- err
 			}
 
 			wg.Done()
@@ -105,6 +108,17 @@ func processFleet(ctx context.Context, trucks []Truck) error {
 	}
 
 	wg.Wait()
+	close(errorsChan)
+
+	var errs []error
+	for err := range errorsChan {
+		log.Printf("Error processing truc: %v \n", err)
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("fleet processing had %d errors", len(errs))
+	}
 
 	return nil
 }
