@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -29,6 +30,10 @@ var (
 	ErrNotImplemented = errors.New("not implemented")
 )
 
+type contextKey string
+
+var UserIDKey contextKey = "userID"
+
 func (nt *NormalTruck) LoadCargo() error {
 	nt.cargo += 1
 	return nil
@@ -52,8 +57,22 @@ func (et *ElectricTruck) UnloadCargo() error {
 }
 
 // processTruck handles the loading and the unloading of a truck
-func processTruck(truck Truck) error {
+func processTruck(ctx context.Context, truck Truck) error {
 	fmt.Printf("Started processing truck %+v \n", truck)
+
+	//access the userID
+	//userID := ctx.Value(UserIDKey)
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*2)
+	defer cancel()
+
+	delay := time.Second * 1
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
+		break
+	}
 
 	// Simulate processing time
 	time.Sleep(time.Second)
@@ -70,14 +89,14 @@ func processTruck(truck Truck) error {
 	return nil
 }
 
-func processFleet(trucks []Truck) error {
+func processFleet(ctx context.Context, trucks []Truck) error {
 	var wg sync.WaitGroup
 
 	for _, t := range trucks {
 		wg.Add(1)
 
 		go func(t Truck) {
-			if err := processTruck(t); err != nil {
+			if err := processTruck(ctx, t); err != nil {
 				log.Println(err)
 			}
 
@@ -91,6 +110,9 @@ func processFleet(trucks []Truck) error {
 }
 
 func main() {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, UserIDKey, 42)
+
 	fleet := []Truck{
 		&NormalTruck{id: "NT1", cargo: 0},
 		&ElectricTruck{id: "ET1", cargo: 0, battery: 100},
@@ -98,7 +120,7 @@ func main() {
 		&ElectricTruck{id: "ET1", cargo: 0, battery: 100},
 	}
 
-	if err := processFleet(fleet); err != nil {
+	if err := processFleet(ctx, fleet); err != nil {
 		fmt.Printf("Error processing fleet: %v\n", err)
 		return
 	}
